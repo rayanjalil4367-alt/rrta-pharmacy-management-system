@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Dashboard — RRTA Pharmaceutical</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="/static/css/style.css"/>
+<style>
+  .chart-wrap { height: 110px; }
+  .recent-sale-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid rgba(0,200,150,0.07); }
+  .recent-sale-row:last-child { border-bottom: none; }
+  .sale-avatar { width: 36px; height: 36px; border-radius: 50%; background: rgba(0,200,150,0.1); display: flex; align-items: center; justify-content: center; font-size: 1rem; flex-shrink: 0; }
+  .sale-info { flex: 1; }
+  .sale-name { font-weight: 600; color: var(--white); font-size: .88rem; }
+  .sale-pharm { font-size: .73rem; color: #6b9e8c; }
+  .sale-amount { font-family: 'Syne', sans-serif; font-weight: 700; color: var(--green); }
+  .sale-date { font-size: .72rem; color: #4a7a6a; margin-top: 2px; }
+  .stock-bar-bg { height: 5px; background: rgba(255,255,255,0.06); border-radius: 99px; overflow: hidden; margin-top: 6px; }
+  .stock-bar-fill { height: 100%; border-radius: 99px; transition: width .6s ease; }
+  .role-info-box {
+    background: rgba(0,200,150,0.06);
+    border: 1px solid rgba(0,200,150,0.2);
+    border-radius: 14px; padding: 16px 20px;
+    margin-bottom: 28px;
+    display: flex; align-items: center; gap: 14px;
+  }
+  .role-info-box .ri-icon { font-size: 1.5rem; }
+  .role-info-box .ri-text { font-size: .85rem; color: #8bb8a8; line-height: 1.5; }
+  .role-info-box .ri-text strong { color: var(--green); }
+  .welcome-text { font-size: .85rem; color: #8bb8a8; margin-top: 4px; }
+</style>
+</head>
+<body>
+<canvas id="bg-canvas"></canvas>
+<div class="page">
+
+<!-- NAV -->
+<nav>
+  <a class="nav-logo" href="/dashboard">
+    ⚕ RRTA Pharmaceutical
+    <span class="pill">PMS</span>
+  </a>
+  <ul class="nav-links">
+    <li><a href="/dashboard" class="active">Dashboard</a></li>
+    <li><a href="/medicines">Medicines</a></li>
+    {% if role != 'analyst' %}<li><a href="/manage">Manage Records</a></li>{% endif %}
+  </ul>
+  <div class="nav-user">
+    <span class="role-badge {{ role }}">{{ role }}</span>
+    <span style="color:var(--text);font-size:.9rem;">{{ user }}</span>
+    <a href="/logout" class="nav-btn outline">Logout</a>
+  </div>
+</nav>
+
+<!-- PAGE HEADER -->
+<div class="page-header">
+  <p class="page-label">Home</p>
+  <h1 class="page-title">Welcome, <span>{{ user }}</span></h1>
+  <p class="welcome-text">Here's the live overview of RRTA Pharmaceutical — today's data straight from MySQL.</p>
+</div>
+
+<div class="content">
+
+  <!-- Role Info -->
+  <div class="role-info-box">
+    <div class="ri-icon">
+      {% if role == 'admin' %}🔐{% elif role == 'pharmacist' %}💊{% else %}📊{% endif %}
+    </div>
+    <div class="ri-text">
+      Logged in as <strong>{{ user }}</strong> with <strong>{{ role }}</strong> privileges.
+      {% if role == 'admin' %}
+        Full access: SELECT, INSERT, UPDATE, DELETE on all tables.
+      {% elif role == 'pharmacist' %}
+        Can view all records and manage customers and sales. Cannot modify medicines.
+      {% else %}
+        Read-only access: SELECT on Customer, Medicine, Inventory, and Product_Sales.
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- KPI GRID -->
+  <div class="kpi-grid" id="kpi-grid">
+    <div class="kpi-card"><div class="kpi-icon">👥</div><div class="kpi-val" id="k-customers">—</div><div class="kpi-lbl">Customers</div><div class="kpi-delta up" id="k-customers-d"></div></div>
+    <div class="kpi-card"><div class="kpi-icon">💊</div><div class="kpi-val" id="k-medicines">—</div><div class="kpi-lbl">Medicines</div><div class="kpi-delta up"></div></div>
+    <div class="kpi-card"><div class="kpi-icon">🧾</div><div class="kpi-val" id="k-sales">—</div><div class="kpi-lbl">Total Sales</div><div class="kpi-delta up"></div></div>
+    <div class="kpi-card"><div class="kpi-icon">💰</div><div class="kpi-val" id="k-revenue">—</div><div class="kpi-lbl">Total Revenue</div><div class="kpi-delta up"></div></div>
+    <div class="kpi-card"><div class="kpi-icon">👨‍⚕️</div><div class="kpi-val" id="k-pharmacists">—</div><div class="kpi-lbl">Pharmacists</div><div class="kpi-delta up">✓ Active</div></div>
+    <div class="kpi-card"><div class="kpi-icon">⚠️</div><div class="kpi-val" id="k-lowstock">—</div><div class="kpi-lbl">Low Stock Items</div><div class="kpi-delta warn" id="k-low-d"></div></div>
+  </div>
+
+  <!-- CHARTS + RECENT SALES -->
+  <div class="two-col">
+    <div class="panel">
+      <div class="panel-title"><span class="dot"></span>Monthly Revenue (Last 6 Months)</div>
+      <div class="chart-wrap" id="chart-wrap">
+        <div class="loading-state"><div class="spinner"></div></div>
+      </div>
+      <div class="chart-label" id="chart-labels"></div>
+    </div>
+    <div class="panel">
+      <div class="panel-title"><span class="dot"></span>Recent Sales</div>
+      <div id="recent-sales-list">
+        <div class="loading-state"><div class="spinner"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- INVENTORY STATUS TABLE -->
+  <div class="panel">
+    <div class="panel-title"><span class="dot"></span>Inventory Snapshot</div>
+    <div style="overflow-x:auto;">
+      <table class="data-table" id="inv-table">
+        <thead>
+          <tr>
+            <th>ID</th><th>Medicine</th><th>Category</th>
+            <th>Stock</th><th>Reorder At</th><th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="inv-tbody">
+          <tr><td colspan="6" class="loading-state"><div class="spinner"></div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div><!-- /content -->
+</div><!-- /page -->
+
+<script src="/static/js/shared.js"></script>
+<script>
+setLiveDate('live-date');
+
+async function loadDashboard() {
+  const data = await api('/api/dashboard-stats');
+
+  // KPIs
+  document.getElementById('k-customers').textContent   = data.customers.toLocaleString();
+  document.getElementById('k-medicines').textContent   = data.medicines.toLocaleString();
+  document.getElementById('k-sales').textContent       = data.sales.toLocaleString();
+  document.getElementById('k-revenue').textContent     = '₨ ' + (data.revenue/1000).toFixed(1) + 'k';
+  document.getElementById('k-pharmacists').textContent = data.pharmacists;
+  document.getElementById('k-lowstock').textContent    = data.low_stock;
+  if (data.low_stock > 0) {
+    document.getElementById('k-low-d').textContent = '▲ Needs attention';
+    document.getElementById('k-low-d').className   = 'kpi-delta warn';
+  }
+
+  // Monthly chart
+  const maxRev = Math.max(...data.monthly.map(m => m.total), 1);
+  const chartWrap = document.getElementById('chart-wrap');
+  chartWrap.className = 'chart-wrap';
+  chartWrap.innerHTML = data.monthly.map((m, i) => {
+    const pct = Math.round((m.total / maxRev) * 100);
+    const active = i === data.monthly.length - 1 ? ' active' : '';
+    return `<div class="chart-bar${active}" style="height:${pct}%" title="${m.month}: ₨${m.total.toLocaleString()}"></div>`;
+  }).join('');
+  document.getElementById('chart-labels').innerHTML =
+    data.monthly.map(m => `<span>${m.month}</span>`).join('');
+
+  // Recent sales
+  const recentEl = document.getElementById('recent-sales-list');
+  recentEl.innerHTML = data.recent_sales.map(s => `
+    <div class="recent-sale-row">
+      <div class="sale-avatar">🧾</div>
+      <div class="sale-info">
+        <div class="sale-name">${s.C_Name}</div>
+        <div class="sale-pharm">via ${s.pharmacist}</div>
+      </div>
+      <div>
+        <div class="sale-amount">₨ ${s.Amount.toLocaleString()}</div>
+        <div class="sale-date">${s.Date}</div>
+      </div>
+    </div>
+  `).join('');
+
+  // Inventory table (reuse medicines API)
+  const meds = await api('/api/medicines');
+  const tbody = document.getElementById('inv-tbody');
+  tbody.innerHTML = meds.slice(0, 15).map(m => {
+    let status, cls;
+    if (m.stock === 0) { status = 'Out of Stock'; cls = 'out'; }
+    else if (m.stock <= m.reorder) { status = 'Low Stock'; cls = 'low'; }
+    else { status = 'In Stock'; cls = 'in'; }
+    const pct = m.reorder > 0 ? Math.min(Math.round((m.stock / (m.reorder * 3)) * 100), 100) : 80;
+    const barCol = cls === 'in' ? '#00c896' : cls === 'low' ? '#ffd166' : '#ff4d6d';
+    return `<tr>
+      <td class="id-col">${m.Medicine_id}</td>
+      <td>${m.Name}</td>
+      <td>${m.Category_name}</td>
+      <td>
+        ${m.stock} units
+        <div class="stock-bar-bg"><div class="stock-bar-fill" style="width:${pct}%;background:${barCol};"></div></div>
+      </td>
+      <td>${m.reorder}</td>
+      <td><span class="badge ${cls}">${status}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+loadDashboard().catch(e => showToast(e.message, true));
+</script>
+</body>
+</html>

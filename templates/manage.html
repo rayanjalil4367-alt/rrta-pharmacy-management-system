@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Manage Records — RRTA Pharmaceutical</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="/static/css/style.css"/>
+<style>
+  .form-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 20px; padding: 32px 36px;
+  }
+  .form-card-title {
+    font-family: 'Syne', sans-serif; font-weight: 700;
+    font-size: 1.15rem; color: var(--white);
+    margin-bottom: 26px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .rbac-box {
+    background: rgba(0,0,0,0.25);
+    border: 1px solid rgba(80,160,255,0.2);
+    border-radius: 14px; padding: 18px 22px;
+    margin-bottom: 28px;
+  }
+  .rbac-box h3 {
+    font-family: 'Syne', sans-serif; font-size: .9rem; font-weight: 700;
+    color: #5fb0ff; margin-bottom: 12px;
+  }
+  .rbac-row {
+    display: flex; align-items: center; gap: 10px;
+    font-size: .82rem; margin-bottom: 8px;
+  }
+  .rbac-row:last-child { margin-bottom: 0; }
+  .rbac-name { width: 90px; font-weight: 700; color: var(--white); }
+  .rbac-role { width: 100px; }
+  .rbac-perms { color: #8bb8a8; font-size: .78rem; }
+  .customers-table-wrap { overflow-x: auto; margin-top: 10px; }
+  .edit-inline { display: none; }
+  .edit-inline.show { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+  .edit-inline input {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid var(--green);
+    border-radius: 8px; padding: 6px 10px;
+    color: var(--white); font-size: .85rem;
+    font-family: 'DM Sans', sans-serif;
+    outline: none; flex: 1;
+  }
+  .lock-msg {
+    background: rgba(255,77,109,0.08);
+    border: 1px solid rgba(255,77,109,0.2);
+    border-radius: 12px; padding: 14px 18px;
+    color: #ff7a92; font-size: .87rem;
+    display: flex; gap: 10px; align-items: center;
+    margin-bottom: 18px;
+  }
+</style>
+</head>
+<body>
+<canvas id="bg-canvas"></canvas>
+<div class="page">
+
+<!-- NAV -->
+<nav>
+  <a class="nav-logo" href="/dashboard">
+    ⚕ RRTA Pharmaceutical <span class="pill">PMS</span>
+  </a>
+  <ul class="nav-links">
+    <li><a href="/dashboard">Dashboard</a></li>
+    <li><a href="/medicines">Medicines</a></li>
+    <li><a href="/manage" class="active">Manage Records</a></li>
+  </ul>
+  <div class="nav-user">
+    <span class="role-badge {{ role }}">{{ role }}</span>
+    <span style="color:var(--text);font-size:.9rem;">{{ user }}</span>
+    <a href="/logout" class="nav-btn outline">Logout</a>
+  </div>
+</nav>
+
+<!-- PAGE HEADER -->
+<div class="page-header">
+  <p class="page-label">Data Management</p>
+  <h1 class="page-title">Manage <span>Records</span></h1>
+  <p class="page-sub">Add, update, or delete records. Role-based restrictions enforced server-side via MySQL GRANT/REVOKE.</p>
+</div>
+
+<div class="content">
+
+  <!-- RBAC SUMMARY -->
+  <div class="rbac-box">
+    <h3>🔐 Role-Based Access Control — Active Permissions</h3>
+    <div class="rbac-row"><span class="rbac-name">Rayan</span><span class="rbac-role"><span class="badge admin">Admin</span></span><span class="rbac-perms">ALL: Customer, Pharmacist, Medicine, Inventory, Supplier, Product_Sales, Sale_Items, Payment, Category</span></div>
+    <div class="rbac-row"><span class="rbac-name">Taha / Ali</span><span class="rbac-role"><span class="badge pharmacist">Pharmacist</span></span><span class="rbac-perms">SELECT/INSERT/UPDATE: Customer, Product_Sales, Sale_Items, Payment · SELECT only: Medicine, Inventory</span></div>
+    <div class="rbac-row"><span class="rbac-name">Rafay</span><span class="rbac-role"><span class="badge analyst">Analyst</span></span><span class="rbac-perms">SELECT only: Customer, Medicine, Inventory, Product_Sales (no write access)</span></div>
+  </div>
+
+  <!-- TABS -->
+  <div class="tab-row">
+    <button class="tab-btn active" onclick="switchTab('add-customer', this)">➕ Add Customer</button>
+    <button class="tab-btn" onclick="switchTab('view-customers', this)">👥 View / Edit Customers</button>
+    <button class="tab-btn" onclick="switchTab('add-sale', this)">🧾 Add Sale</button>
+    {% if role == 'admin' %}
+    <button class="tab-btn" onclick="switchTab('add-medicine', this)">💊 Add Medicine</button>
+    {% endif %}
+    <button class="tab-btn" onclick="switchTab('sql-rbac', this)">🔐 RBAC SQL</button>
+  </div>
+
+  <!-- ── ADD CUSTOMER ── -->
+  <div class="tab-content active" id="tab-add-customer">
+    <div class="form-card">
+      <div class="form-card-title">➕ Add New Customer</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label">Full Name</label>
+          <input class="form-input" id="c-name" placeholder="e.g. Ahmad Khan"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Phone Number</label>
+          <input class="form-input" id="c-phone" placeholder="e.g. 0300-1234567"/>
+        </div>
+        <div class="form-group form-grid full">
+          <label class="form-label">Address</label>
+          <input class="form-input" id="c-address" placeholder="e.g. House 12, Gulberg, Lahore"/>
+        </div>
+      </div>
+      <div class="sql-box" id="sql-add-customer">
+<span class="kw">INSERT INTO</span> Customer (customer_id, C_Name, Phone_no, Address)
+<span class="kw">VALUES</span> (AUTO, '<span class="val" id="sqv-c-name">?</span>', '<span class="val" id="sqv-c-phone">?</span>', '<span class="val" id="sqv-c-address">?</span>');</div>
+      <div class="btn-row">
+        <button class="btn-primary" onclick="addCustomer()">Add Customer</button>
+        <button class="btn-secondary" onclick="clearForm('c-name','c-phone','c-address')">Reset</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── VIEW / EDIT CUSTOMERS ── -->
+  <div class="tab-content" id="tab-view-customers">
+    <div class="panel">
+      <div class="panel-title"><span class="dot"></span>Customer Records</div>
+      <div class="controls">
+        <div class="search-wrap">
+          <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+          </svg>
+          <input type="text" id="cust-search" placeholder="Search by name, phone, city…" oninput="loadCustomers()"/>
+        </div>
+      </div>
+      <div class="customers-table-wrap">
+        <table class="data-table">
+          <thead><tr><th>ID</th><th>Name</th><th>Phone</th><th>Address</th><th>Actions</th></tr></thead>
+          <tbody id="cust-tbody">
+            <tr><td colspan="5" class="loading-state"><div class="spinner"></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── ADD SALE ── -->
+  <div class="tab-content" id="tab-add-sale">
+    <div class="form-card">
+      <div class="form-card-title">🧾 Record a New Sale</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label">Customer ID</label>
+          <input class="form-input" id="s-cust" type="number" placeholder="e.g. 1"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Pharmacist</label>
+          <select class="form-select" id="s-pharm">
+            <option value="">Loading…</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Sale Date</label>
+          <input class="form-input" id="s-date" type="date"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Total Amount (₨)</label>
+          <input class="form-input" id="s-amount" type="number" placeholder="e.g. 750"/>
+        </div>
+      </div>
+      <div class="sql-box" id="sql-add-sale">
+<span class="kw">INSERT INTO</span> Product_Sales (P_Sales_id, customer_id, Pharmacist_id, Date, Amount)
+<span class="kw">VALUES</span> (AUTO, <span class="val" id="sqv-s-cust">?</span>, <span class="val" id="sqv-s-pharm">?</span>, '<span class="val" id="sqv-s-date">?</span>', <span class="val" id="sqv-s-amount">?</span>);</div>
+      <div class="btn-row">
+        <button class="btn-primary" onclick="addSale()">Record Sale</button>
+        <button class="btn-secondary" onclick="clearForm('s-cust','s-amount','s-date')">Reset</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── ADD MEDICINE (Admin only) ── -->
+  {% if role == 'admin' %}
+  <div class="tab-content" id="tab-add-medicine">
+    <div class="form-card">
+      <div class="form-card-title">💊 Add New Medicine <span style="font-size:.75rem;color:var(--green);font-weight:600;background:rgba(0,200,150,0.1);padding:2px 10px;border-radius:99px;margin-left:8px;">Admin Only</span></div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label">Medicine Name</label>
+          <input class="form-input" id="m-name" placeholder="e.g. Augmentin 625mg"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Batch No.</label>
+          <input class="form-input" id="m-batch" placeholder="e.g. BT-9999"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Expiry Date</label>
+          <input class="form-input" id="m-expiry" type="date"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Price (₨)</label>
+          <input class="form-input" id="m-price" type="number" placeholder="e.g. 350"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Category ID</label>
+          <select class="form-select" id="m-cat-id">
+            <option value="1">1 — Analgesic</option>
+            <option value="2">2 — Antibiotic</option>
+            <option value="3">3 — Antifungal</option>
+            <option value="4">4 — Antihistamine</option>
+            <option value="5">5 — Cardiovascular</option>
+            <option value="6">6 — Dermatology</option>
+            <option value="7">7 — Gastrointestinal</option>
+            <option value="8">8 — Neurological</option>
+            <option value="9">9 — Respiratory</option>
+            <option value="10">10 — Supplement</option>
+          </select>
+        </div>
+      </div>
+      <div class="sql-box">
+<span class="kw">INSERT INTO</span> Medicine (Medicine_id, Name, Batch_no, Expiry_date, Price, Category_id)
+<span class="kw">VALUES</span> (AUTO, '<span class="val" id="sqv-m-name">?</span>', '<span class="val" id="sqv-m-batch">?</span>', '<span class="val" id="sqv-m-expiry">?</span>', <span class="val" id="sqv-m-price">?</span>, <span class="val" id="sqv-m-cat">?</span>);</div>
+      <div class="btn-row">
+        <button class="btn-primary" onclick="addMedicine()">Add Medicine</button>
+        <button class="btn-secondary" onclick="clearForm('m-name','m-batch','m-expiry','m-price')">Reset</button>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div class="tab-content" id="tab-add-medicine">
+    <div class="lock-msg">🔒 Adding medicines requires Admin role. Your current role is <strong>{{ role }}</strong>.</div>
+  </div>
+  {% endif %}
+
+  <!-- ── RBAC SQL ── -->
+  <div class="tab-content" id="tab-sql-rbac">
+    <div class="panel">
+      <div class="panel-title"><span class="dot"></span>MySQL RBAC Implementation</div>
+      <p style="color:#8bb8a8;font-size:.88rem;margin-bottom:20px;">
+        The SQL below defines all three roles, grants table-level privileges, and includes a REVOKE demonstration.
+        This SQL lives in <code style="color:var(--green);">rbac.sql</code> and was applied on the MySQL server.
+      </p>
+      <div class="sql-box" style="font-size:.78rem;max-height:520px;overflow-y:auto;">-- ═══════════════════════════════════════════════════════════
+-- RRTA Pharmaceutical — Role-Based Access Control
+-- Three roles: admin_user, pharmacist_user, analyst_user
+-- ═══════════════════════════════════════════════════════════
+
+-- ── DROP old users if re-running ──────────────────────────
+DROP USER IF EXISTS 'rayan_admin'@'localhost';
+DROP USER IF EXISTS 'taha_pharm'@'localhost';
+DROP USER IF EXISTS 'ali_pharm'@'localhost';
+DROP USER IF EXISTS 'rafay_analyst'@'localhost';
+
+-- ── ROLE 1: Admin (Rayan) ─────────────────────────────────
+-- Full SELECT, INSERT, UPDATE, DELETE on all tables
+CREATE USER 'rayan_admin'@'localhost' IDENTIFIED BY 'rayan123';
+
+GRANT SELECT, INSERT, UPDATE, DELETE
+  ON PharmacyManagementSystem.Customer        TO 'rayan_admin'@'localhost';
+GRANT SELECT, INSERT, UPDATE, DELETE
+  ON PharmacyManagementSystem.Medicine        TO 'rayan_admin'@'localhost';
+GRANT SELECT, INSERT, UPDATE, DELETE
+  ON PharmacyManagementSystem.Pharmacist      TO 'rayan_admin'@'localhost';
+GRANT SELECT, INSERT, UPDATE, DELETE
+  ON PharmacyManagementSystem.Category        TO 'rayan_admin'@'localhost';
+GRANT SELECT, INSERT, UPDATE, DELETE
+  ON PharmacyManagementSystem.Supplier        TO 'rayan_admin'@'localhost';
+GRANT SELECT, INSERT, UPDATE, DELETE
+  ON PharmacyManagementSystem.Inventory       TO 'rayan_admin'@'localhost';
+GRANT SELECT, INSERT, UPDATE, DELETE
+  ON PharmacyManagementSystem.Product_Sales   TO 'rayan_admin'@'localhost';
+GRANT SELECT, INSERT, UPDATE, DELETE
+  ON PharmacyManagementSystem.Sale_Items      TO 'rayan_admin'@'localhost';
+GRANT SELECT, INSERT, UPDATE, DELETE
+  ON PharmacyManagementSystem.Payment         TO 'rayan_admin'@'localhost';
+
+-- ── ROLE 2: Pharmacist (Taha, Ali) ───────────────────────
+-- Can manage customers and sales; read-only on medicine/inventory
+CREATE USER 'taha_pharm'@'localhost' IDENTIFIED BY 'taha456';
+CREATE USER 'ali_pharm'@'localhost'  IDENTIFIED BY 'ali789';
+
+GRANT SELECT, INSERT, UPDATE
+  ON PharmacyManagementSystem.Customer        TO 'taha_pharm'@'localhost';
+GRANT SELECT, INSERT, UPDATE
+  ON PharmacyManagementSystem.Customer        TO 'ali_pharm'@'localhost';
+
+GRANT SELECT, INSERT
+  ON PharmacyManagementSystem.Product_Sales   TO 'taha_pharm'@'localhost';
+GRANT SELECT, INSERT
+  ON PharmacyManagementSystem.Product_Sales   TO 'ali_pharm'@'localhost';
+
+GRANT SELECT, INSERT
+  ON PharmacyManagementSystem.Sale_Items      TO 'taha_pharm'@'localhost';
+GRANT SELECT, INSERT
+  ON PharmacyManagementSystem.Sale_Items      TO 'ali_pharm'@'localhost';
+
+GRANT SELECT, INSERT
+  ON PharmacyManagementSystem.Payment         TO 'taha_pharm'@'localhost';
+GRANT SELECT, INSERT
+  ON PharmacyManagementSystem.Payment         TO 'ali_pharm'@'localhost';
+
+-- Read-only on medicines and inventory
+GRANT SELECT
+  ON PharmacyManagementSystem.Medicine        TO 'taha_pharm'@'localhost';
+GRANT SELECT
+  ON PharmacyManagementSystem.Medicine        TO 'ali_pharm'@'localhost';
+GRANT SELECT
+  ON PharmacyManagementSystem.Inventory       TO 'taha_pharm'@'localhost';
+GRANT SELECT
+  ON PharmacyManagementSystem.Inventory       TO 'ali_pharm'@'localhost';
+
+-- ── ROLE 3: Analyst (Rafay) ───────────────────────────────
+-- Read-only on key reporting tables, no write access
+CREATE USER 'rafay_analyst'@'localhost' IDENTIFIED BY 'rafay321';
+
+GRANT SELECT
+  ON PharmacyManagementSystem.Customer        TO 'rafay_analyst'@'localhost';
+GRANT SELECT
+  ON PharmacyManagementSystem.Medicine        TO 'rafay_analyst'@'localhost';
+GRANT SELECT
+  ON PharmacyManagementSystem.Inventory       TO 'rafay_analyst'@'localhost';
+GRANT SELECT
+  ON PharmacyManagementSystem.Product_Sales   TO 'rafay_analyst'@'localhost';
+GRANT SELECT
+  ON PharmacyManagementSystem.Payment         TO 'rafay_analyst'@'localhost';
+GRANT SELECT
+  ON PharmacyManagementSystem.Category        TO 'rafay_analyst'@'localhost';
+
+-- ── REVOKE DEMONSTRATION ──────────────────────────────────
+-- Initially pharmacists were granted DELETE on Customer.
+-- Security review: remove DELETE from pharmacist role.
+REVOKE DELETE
+  ON PharmacyManagementSystem.Customer
+  FROM 'taha_pharm'@'localhost';
+REVOKE DELETE
+  ON PharmacyManagementSystem.Customer
+  FROM 'ali_pharm'@'localhost';
+
+-- Also revoke Salary visibility from analyst on Pharmacist table
+-- (Pharmacist table not granted to analyst; confirming exclusion)
+-- (No revoke needed — it was never granted.)
+
+-- ── APPLY ALL CHANGES ─────────────────────────────────────
+FLUSH PRIVILEGES;
+
+-- ── VERIFY ───────────────────────────────────────────────
+SHOW GRANTS FOR 'rayan_admin'@'localhost';
+SHOW GRANTS FOR 'taha_pharm'@'localhost';
+SHOW GRANTS FOR 'rafay_analyst'@'localhost';</div>
+    </div>
+  </div>
+
+</div><!-- /content -->
+</div><!-- /page -->
+
+<div id="toast" class="toast"></div>
+
+<script src="/static/js/shared.js"></script>
+<script>
+// ── TABS ──────────────────────────────────────────────────────────────────────
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  btn.classList.add('active');
+  if (name === 'view-customers') loadCustomers();
+}
+
+// ── LIVE SQL PREVIEW ──────────────────────────────────────────────────────────
+function bindSqlPreview(inputId, previewId) {
+  const el = document.getElementById(inputId);
+  const pv = document.getElementById(previewId);
+  if (!el || !pv) return;
+  const ev = el.tagName === 'SELECT' ? 'change' : 'input';
+  el.addEventListener(ev, () => { pv.textContent = el.value || '?'; });
+}
+bindSqlPreview('c-name',    'sqv-c-name');
+bindSqlPreview('c-phone',   'sqv-c-phone');
+bindSqlPreview('c-address', 'sqv-c-address');
+bindSqlPreview('s-cust',    'sqv-s-cust');
+bindSqlPreview('s-date',    'sqv-s-date');
+bindSqlPreview('s-amount',  'sqv-s-amount');
+bindSqlPreview('s-pharm',   'sqv-s-pharm');
+bindSqlPreview('m-name',    'sqv-m-name');
+bindSqlPreview('m-batch',   'sqv-m-batch');
+bindSqlPreview('m-expiry',  'sqv-m-expiry');
+bindSqlPreview('m-price',   'sqv-m-price');
+bindSqlPreview('m-cat-id',  'sqv-m-cat');
+
+// ── HELPERS ───────────────────────────────────────────────────────────────────
+function clearForm(...ids) {
+  ids.forEach(id => {
+    const el = document.getElementById(id);
+    if (el && el.tagName !== 'SELECT') el.value = '';
+    if (el) el.style.borderColor = '';
+  });
+}
+
+function validate(...ids) {
+  let ok = true;
+  ids.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (!el.value.trim()) { el.style.borderColor = 'var(--red)'; ok = false; }
+    else el.style.borderColor = '';
+  });
+  return ok;
+}
+
+// ── ADD CUSTOMER ──────────────────────────────────────────────────────────────
+async function addCustomer() {
+  if (!validate('c-name', 'c-phone', 'c-address')) return;
+  try {
+    const res = await api('/api/add-customer', {
+      method: 'POST',
+      body: JSON.stringify({
+        name:    document.getElementById('c-name').value.trim(),
+        phone:   document.getElementById('c-phone').value.trim(),
+        address: document.getElementById('c-address').value.trim()
+      })
+    });
+    showToast('Customer added! ID: ' + res.id);
+    clearForm('c-name', 'c-phone', 'c-address');
+  } catch(e) { showToast(e.message, true); }
+}
+
+// ── LOAD CUSTOMERS ────────────────────────────────────────────────────────────
+async function loadCustomers() {
+  const q = (document.getElementById('cust-search')?.value || '');
+  const tbody = document.getElementById('cust-tbody');
+  tbody.innerHTML = '<tr><td colspan="5" class="loading-state"><div class="spinner"></div></td></tr>';
+  try {
+    const rows = await api('/api/customers?q=' + encodeURIComponent(q));
+    if (!rows.length) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:30px;color:#4a7a6a;">No customers found.</td></tr>'; return; }
+    tbody.innerHTML = rows.map(r => `
+      <tr id="crow-${r.customer_id}">
+        <td class="id-col">${r.customer_id}</td>
+        <td><strong style="color:var(--white);">${r.C_Name}</strong></td>
+        <td>${r.Phone_no}</td>
+        <td>${r.Address}</td>
+        <td>
+          <button class="btn-edit" onclick="startEdit(${r.customer_id},'${r.C_Name}')">Edit</button>
+          <button class="btn-danger" style="margin-left:6px;" onclick="deleteCustomer(${r.customer_id},'${r.C_Name}')">Delete</button>
+          <div class="edit-inline" id="einline-${r.customer_id}">
+            <input id="einput-${r.customer_id}" value="${r.C_Name}" placeholder="New name"/>
+            <button class="btn-primary" style="padding:6px 14px;font-size:.78rem;" onclick="saveEdit(${r.customer_id})">Save</button>
+            <button class="btn-secondary" style="padding:6px 14px;font-size:.78rem;" onclick="cancelEdit(${r.customer_id})">✕</button>
+          </div>
+        </td>
+      </tr>`).join('');
+  } catch(e) { showToast(e.message, true); }
+}
+
+function startEdit(id, name) {
+  const el = document.getElementById('einline-' + id);
+  el.classList.add('show');
+  document.getElementById('einput-' + id).focus();
+}
+function cancelEdit(id) { document.getElementById('einline-' + id).classList.remove('show'); }
+async function saveEdit(id) {
+  const val = document.getElementById('einput-' + id).value.trim();
+  if (!val) return showToast('Name cannot be empty', true);
+  try {
+    await api('/api/update-customer', {
+      method: 'POST',
+      body: JSON.stringify({ id, field: 'C_Name', value: val })
+    });
+    showToast('Customer updated!');
+    loadCustomers();
+  } catch(e) { showToast(e.message, true); }
+}
+
+async function deleteCustomer(id, name) {
+  if (!confirm(`DELETE Customer "${name}" (ID: ${id})?\n\nThis will cascade-delete their sales records.`)) return;
+  try {
+    await api('/api/delete-customer/' + id, { method: 'DELETE' });
+    showToast('Customer deleted.');
+    loadCustomers();
+  } catch(e) { showToast(e.message, true); }
+}
+
+// ── ADD SALE ──────────────────────────────────────────────────────────────────
+async function addSale() {
+  if (!validate('s-cust', 's-amount', 's-date')) return;
+  const pharmId = document.getElementById('s-pharm').value;
+  if (!pharmId) return showToast('Select a pharmacist', true);
+  try {
+    const res = await api('/api/add-sale', {
+      method: 'POST',
+      body: JSON.stringify({
+        customer_id:   parseInt(document.getElementById('s-cust').value),
+        pharmacist_id: parseInt(pharmId),
+        date:          document.getElementById('s-date').value,
+        amount:        parseFloat(document.getElementById('s-amount').value)
+      })
+    });
+    showToast('Sale recorded! ID: ' + res.id);
+    clearForm('s-cust', 's-amount', 's-date');
+  } catch(e) { showToast(e.message, true); }
+}
+
+// ── ADD MEDICINE ──────────────────────────────────────────────────────────────
+async function addMedicine() {
+  if (!validate('m-name', 'm-batch', 'm-expiry', 'm-price')) return;
+  try {
+    const res = await api('/api/add-medicine', {
+      method: 'POST',
+      body: JSON.stringify({
+        name:        document.getElementById('m-name').value.trim(),
+        batch:       document.getElementById('m-batch').value.trim(),
+        expiry:      document.getElementById('m-expiry').value,
+        price:       parseFloat(document.getElementById('m-price').value),
+        category_id: parseInt(document.getElementById('m-cat-id').value)
+      })
+    });
+    showToast('Medicine added! ID: ' + res.id);
+    clearForm('m-name', 'm-batch', 'm-expiry', 'm-price');
+  } catch(e) { showToast(e.message, true); }
+}
+
+// ── LOAD PHARMACISTS FOR DROPDOWN ─────────────────────────────────────────────
+async function loadPharmacists() {
+  const sel = document.getElementById('s-pharm');
+  const list = await api('/api/pharmacists');
+  sel.innerHTML = '<option value="">Select pharmacist…</option>' +
+    list.map(p => `<option value="${p.Pharmacist_id}">${p.P_Name}</option>`).join('');
+}
+
+// Set today's date as default
+document.getElementById('s-date').value = new Date().toISOString().split('T')[0];
+loadPharmacists();
+loadCustomers();
+</script>
+</body>
+</html>

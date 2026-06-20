@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>RRTA Pharmaceutical — Admin Login</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="/static/css/style.css"/>
+<style>
+  body { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+  .login-wrap {
+    width: 100%; max-width: 480px;
+    padding: 24px;
+    animation: fadeUp .6s ease both;
+  }
+  .login-logo {
+    text-align: center; margin-bottom: 36px;
+  }
+  .login-logo h1 {
+    font-family: 'Syne', sans-serif; font-weight: 800;
+    font-size: 1.6rem; color: var(--green);
+    letter-spacing: .04em;
+  }
+  .login-logo p { color: #8bb8a8; font-size: .9rem; margin-top: 6px; }
+  .login-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 24px; padding: 40px 36px;
+    box-shadow: var(--glow);
+  }
+  .login-card h2 {
+    font-family: 'Syne', sans-serif; font-weight: 700;
+    font-size: 1.3rem; color: var(--white);
+    margin-bottom: 6px;
+  }
+  .login-card p.sub { color: #6b9e8c; font-size: .88rem; margin-bottom: 32px; }
+  .admin-grid {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 10px; margin-bottom: 24px;
+  }
+  .admin-option {
+    border: 1.5px solid var(--border);
+    border-radius: 12px; padding: 14px 16px;
+    cursor: pointer; transition: all .2s;
+    background: rgba(255,255,255,0.02);
+  }
+  .admin-option:hover, .admin-option.selected {
+    border-color: var(--green);
+    background: rgba(0,200,150,0.08);
+  }
+  .admin-option input[type="radio"] { display: none; }
+  .admin-avatar {
+    width: 38px; height: 38px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.1rem; margin-bottom: 8px;
+    background: rgba(0,200,150,0.12);
+  }
+  .admin-name {
+    font-family: 'Syne', sans-serif; font-weight: 700;
+    font-size: .9rem; color: var(--white);
+  }
+  .admin-role {
+    font-size: .7rem; color: #6b9e8c;
+    margin-top: 2px; text-transform: capitalize;
+  }
+  .pw-wrap { position: relative; }
+  .pw-wrap input { padding-right: 46px; }
+  .pw-toggle {
+    position: absolute; right: 14px; top: 50%;
+    transform: translateY(-50%);
+    background: none; border: none;
+    color: #6b9e8c; cursor: pointer;
+    font-size: 1rem; padding: 2px;
+  }
+  .pw-toggle:hover { color: var(--green); }
+  .login-btn {
+    width: 100%; padding: 14px;
+    margin-top: 20px;
+    background: var(--green); color: var(--navy);
+    border: none; border-radius: 99px;
+    font-family: 'Syne', sans-serif; font-weight: 700;
+    font-size: 1rem; cursor: pointer;
+    transition: all .2s;
+    box-shadow: 0 0 28px rgba(0,200,150,0.35);
+  }
+  .login-btn:hover { background: var(--teal); transform: translateY(-2px); }
+  .error-msg {
+    background: rgba(255,77,109,0.1);
+    border: 1px solid rgba(255,77,109,0.3);
+    border-radius: 10px; padding: 12px 16px;
+    color: var(--red); font-size: .88rem;
+    margin-bottom: 18px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .hint-row {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 8px; margin-top: 24px;
+    border-top: 1px solid var(--border); padding-top: 20px;
+  }
+  .hint-card {
+    background: rgba(0,0,0,0.2);
+    border: 1px solid rgba(0,200,150,0.1);
+    border-radius: 10px; padding: 10px 14px;
+  }
+  .hint-name { font-weight: 700; font-size: .8rem; color: var(--white); }
+  .hint-info { font-size: .72rem; color: #4a7a6a; margin-top: 2px; }
+</style>
+</head>
+<body>
+<canvas id="bg-canvas"></canvas>
+<div class="page login-wrap">
+  <div class="login-logo">
+    <h1>⚕ RRTA Pharmaceutical</h1>
+    <p>Admin Management System</p>
+  </div>
+
+  <div class="login-card">
+    <h2>Welcome Back</h2>
+    <p class="sub">Select your admin profile and enter your password.</p>
+
+    {% if error %}
+    <div class="error-msg">⚠ {{ error }}</div>
+    {% endif %}
+
+    <form method="POST" action="/login">
+      <div class="admin-grid">
+        <label class="admin-option" id="opt-Rayan">
+          <input type="radio" name="admin" value="Rayan" required/>
+          <div class="admin-avatar">👨‍💻</div>
+          <div class="admin-name">Rayan</div>
+          <div class="admin-role">Admin</div>
+        </label>
+        <label class="admin-option" id="opt-Taha">
+          <input type="radio" name="admin" value="Taha"/>
+          <div class="admin-avatar">👨‍⚕️</div>
+          <div class="admin-name">Taha</div>
+          <div class="admin-role">Pharmacist</div>
+        </label>
+        <label class="admin-option" id="opt-Ali">
+          <input type="radio" name="admin" value="Ali"/>
+          <div class="admin-avatar">👨‍⚕️</div>
+          <div class="admin-name">Ali</div>
+          <div class="admin-role">Pharmacist</div>
+        </label>
+        <label class="admin-option" id="opt-Rafay">
+          <input type="radio" name="admin" value="Rafay"/>
+          <div class="admin-avatar">📊</div>
+          <div class="admin-name">Rafay</div>
+          <div class="admin-role">Analyst</div>
+        </label>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Password</label>
+        <div class="pw-wrap">
+          <input class="form-input" type="password" name="password"
+                 id="pw-field" placeholder="Enter your password" required
+                 style="width:100%;"/>
+          <button type="button" class="pw-toggle" onclick="togglePw()">👁</button>
+        </div>
+      </div>
+
+      <button type="submit" class="login-btn">Sign In →</button>
+    </form>
+
+    <!-- Hint panel for demo/graders -->
+    <div class="hint-row">
+      <div class="hint-card"><div class="hint-name">Rayan</div><div class="hint-info">rayan123 · Admin</div></div>
+      <div class="hint-card"><div class="hint-name">Taha</div><div class="hint-info">taha456 · Pharmacist</div></div>
+      <div class="hint-card"><div class="hint-name">Ali</div><div class="hint-info">ali789 · Pharmacist</div></div>
+      <div class="hint-card"><div class="hint-name">Rafay</div><div class="hint-info">rafay321 · Analyst</div></div>
+    </div>
+  </div>
+</div>
+
+<script src="/static/js/shared.js"></script>
+<script>
+  // Highlight selected admin card
+  document.querySelectorAll('.admin-option input[type="radio"]').forEach(r => {
+    r.addEventListener('change', () => {
+      document.querySelectorAll('.admin-option').forEach(o => o.classList.remove('selected'));
+      r.closest('.admin-option').classList.add('selected');
+    });
+  });
+  function togglePw() {
+    const f = document.getElementById('pw-field');
+    f.type = f.type === 'password' ? 'text' : 'password';
+  }
+</script>
+</body>
+</html>
