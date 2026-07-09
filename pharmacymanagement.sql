@@ -1,5 +1,5 @@
 CREATE DATABASE IF NOT EXISTS PharmacyManagementSystem;
-USE PharmacyManagementSystem;─────────────────────────────────────────────
+USE PharmacyManagementSystem;
 
 CREATE TABLE Customer (
     customer_id INT PRIMARY KEY,

@@ -1,0 +1,42 @@
+services:
+  db:
+    image: mysql:8.0
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME}
+    ports:
+      - "3007:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./pharmacymanagement.sql:/docker-entrypoint-initdb.d/1_schema.sql
+      - ./rbac.sql:/docker-entrypoint-initdb.d/2_rbac.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  web:
+    build: .
+    restart: always
+    ports:
+      - "5000:5000"
+    environment:
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      SECRET_KEY: ${SECRET_KEY}
+      FLASK_DEBUG: ${FLASK_DEBUG}
+      RAYAN_PASSWORD: ${RAYAN_PASSWORD}
+      TAHA_PASSWORD: ${TAHA_PASSWORD}
+      ALI_PASSWORD: ${ALI_PASSWORD}
+      RAFAY_PASSWORD: ${RAFAY_PASSWORD}
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  mysql_data:
